@@ -1,4 +1,4 @@
-package main
+package base
 
 import (
 	"net"
@@ -9,27 +9,7 @@ import (
 	"strings"
 )
 
-func main() {
-	listenAddress := "0.0.0.0:8080"
-	listener, err := net.Listen("tcp", listenAddress)
-	if err != nil {
-		fmt.Println("Listen failed: ", err)
-		return
-	}
-	defer listener.Close()
-	fmt.Printf("Server is running on %s\n", listenAddress)
-
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			fmt.Println("Failed to accept client connection: ", err)
-			continue
-		}
-		go handleConn(conn)
-	}
-}
-
-func handleConn(conn net.Conn) {
+func HandleRequest(conn net.Conn) {
 	err := auth(conn)
 	if err != nil {
 		fmt.Println("Authentication failed:", err)
@@ -42,7 +22,7 @@ func handleConn(conn net.Conn) {
 		conn.Close();
 		return;
 	}
-	forward(conn, target)
+	Forward(conn, target)
 }
 
 func auth(conn net.Conn) error {
@@ -182,7 +162,7 @@ func connect(client net.Conn) (net.Conn, error) {
 	return dest, nil
 }
 
-func forward(client, target net.Conn) {
+func Forward(client, target net.Conn) {
 	forwarding := func(src, dest net.Conn) {
 		defer src.Close()
 		defer dest.Close()

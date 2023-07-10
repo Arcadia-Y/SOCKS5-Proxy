@@ -1,3 +1,3 @@
-module socks5
+module proxy
 
 go 1.18
