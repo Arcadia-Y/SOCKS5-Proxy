@@ -1,8 +1,8 @@
 package main
 
 import (
-	"net"
 	"fmt"
+	"net"
 	"proxy/base"
 )
 
@@ -48,5 +48,5 @@ func serverListen(port net.Listener) {
 			fmt.Println("Failed to accept client request:", err)
 		}
 		go base.HandleRequest(conn)
-	}	
+	}
 }

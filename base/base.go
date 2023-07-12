@@ -29,15 +29,15 @@ func auth(conn net.Conn) error {
 	var buf [256]byte
 	n, err := io.ReadFull(conn, buf[:2])
 	if n != 2 || err != nil {
-		return errors.New("Failed to read header")
+		return errors.New("failed to read header")
 	}
 	ver, nmethods := buf[0], int(buf[1])
 	if ver != 5 {
-		return errors.New("Invalid version")
+		return errors.New("invalid version")
 	}
 	n, err = io.ReadFull(conn, buf[:nmethods])
 	if n != nmethods || err != nil {
-		return errors.New("Failed to read methods")
+		return errors.New("failed to read methods")
 	}
 	// no auth for now
 	flag := false
@@ -54,10 +54,10 @@ func auth(conn net.Conn) error {
 
 	n, err = conn.Write([]byte{0x05, method})
 	if n != 2 || err != nil {
-		return errors.New("Failed to write response")
+		return errors.New("failed to write response")
 	}
 	if (!flag) {
-		return errors.New("Method not supported")
+		return errors.New("method not supported")
 	}
 	return nil
 }
@@ -66,16 +66,16 @@ func connect(client net.Conn) (net.Conn, error) {
 	var buf [256] byte
 	n, err := io.ReadFull(client, buf[:4])
 	if n != 4 || err != nil {
-		return nil, errors.New("Failed to read header")
+		return nil, errors.New("failed to read header")
 	}
 	ver, cmd, _, atyp := int(buf[0]), int(buf[1]), buf[2], int(buf[3])
 	if ver != 5 {
-		return nil, errors.New("Invalid version")
+		return nil, errors.New("invalid version")
 	}
 	// only support CMD CONNECT
 	if cmd != 1 {
 		client.Write([]byte{5, 7})
-		return nil, errors.New("Invalid cmd")
+		return nil, errors.New("invalid cmd")
 	}
 	
 	addr := ""
@@ -84,7 +84,7 @@ func connect(client net.Conn) (net.Conn, error) {
 	case 1:
 		n, err = io.ReadFull(client, buf[:4])
 		if n != 4 || err != nil {
-			return nil, errors.New("Failed to read IPv4 address")
+			return nil, errors.New("failed to read IPv4 address")
 		}
 		ip := net.IP(buf[:4])
 		addr = ip.String()
@@ -92,30 +92,30 @@ func connect(client net.Conn) (net.Conn, error) {
 	case 3:
 		n, err = io.ReadFull(client, buf[:1])
 		if n != 1 || err != nil {
-			return nil, errors.New("Failed to read hostname")
+			return nil, errors.New("failed to read hostname")
 		}
 		addrLen := int(buf[0])
 		n, err = io.ReadFull(client, buf[:addrLen])
 		if n != addrLen || err != nil {
-			return nil, errors.New("Failed to read hostname")
+			return nil, errors.New("failed to read hostname")
 		}
 		addr = string(buf[:addrLen])
 	// IPv6
 	case 4:
 		n, err = io.ReadFull(client, buf[:16])
 		if n != 16 || err != nil {
-			return nil, errors.New("Failed to read IPv6 address")
+			return nil, errors.New("failed to read IPv6 address")
 		}
 		ip := net.IP(buf[:16])
 		addr = "[" + ip.String() + "]"
 	default:
 		client.Write([]byte{5, 8})
-		return nil, errors.New("Invalid atyp")
+		return nil, errors.New("invalid atyp")
 	}
 
 	n, err = io.ReadFull(client, buf[:2])
 	if n != 2 || err != nil {
-		return nil, errors.New("Failed to read port")
+		return nil, errors.New("failed to read port")
 	}
 	port := binary.BigEndian.Uint16(buf[:2])
 
@@ -145,16 +145,16 @@ func connect(client net.Conn) (net.Conn, error) {
 		buf[3] = 1
 		copy(buf[4:8], ip.To4())
 		binary.BigEndian.PutUint16(buf[8:10], port)
-		n, err = client.Write(buf[:10])
+		_, err = client.Write(buf[:10])
 	} else {
 		buf[3] = 4
 		copy(buf[4:20], ip.To16())
 		binary.BigEndian.PutUint16(buf[20:22], port)
-		n, err = client.Write(buf[:22])
+		_, err = client.Write(buf[:22])
 	}
 	if err != nil {
 		dest.Close()
-		return nil, errors.New("Failed to write response")
+		return nil, errors.New("failed to write response")
 	}
 	fmt.Println("Connection established:", destAddr)
 	//fmt.Println(client.RemoteAddr().String(), "->", client.LocalAddr().String())
