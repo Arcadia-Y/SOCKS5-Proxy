@@ -3,16 +3,20 @@ package main
 import (
 	"fmt"
 	"net"
-	"proxy/base"
+	"os/exec"
 	"proxy/client"
 )
 
 func main() {
 	clientAddress := "0.0.0.0:8080"
-	socks5Address := "0.0.0.0:1080"
+	proxyAddr, err := client.ParseProxyAddr("proxyAddr.db")
+	if err != nil {
+		fmt.Println("Failed to parse proxy address:", err)
+		return
+	}
 
 	var socksRule client.Rules
-	err := socksRule.ParseRules("socksRule.db")
+	err = socksRule.ParseRules("socksRule.db")
 	if err != nil {
 		fmt.Println("Failed to parse rules:", err)
 		return
@@ -26,14 +30,12 @@ func main() {
 	defer proxyClient.Close()
 	fmt.Printf("Proxy Client is running on %s\n", clientAddress)
 
-	socks5Server, err := net.Listen("tcp", socks5Address)
-	if err != nil {
-		fmt.Println("Listen failed:", err)
-		return
+	for _, addr := range proxyAddr {
+		cmd := exec.Command("./serverListen", addr)
+		cmd.Start()
+		defer cmd.Process.Kill()
+		fmt.Println("SOCKS5 server is running on", addr)
 	}
-	defer socks5Server.Close()
-	fmt.Printf("SOCKS5 Proxy Server is running on %s\n", socks5Address)
 
-	go base.ServerListen(socks5Server)
-	client.ClientListen(proxyClient, socks5Address, &socksRule)
+	client.ClientListen(proxyClient, proxyAddr, &socksRule)
 }

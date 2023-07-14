@@ -6,21 +6,26 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
+	"os/exec"
 	"proxy/base"
+	"strconv"
 )
 
-func ClientListen(port net.Listener, proxyAddress string, rule *Rules) {
+func ClientListen(port net.Listener, proxyAddress []string, rule *Rules) {
 	for {
 		receiver, err := port.Accept()
 		if err != nil {
 			fmt.Println("Failed to accept user request:", err)
+			exec.Command("sh", "-c", "echo 1; lsof -p "+fmt.Sprint(os.Getpid()))
+
 			continue
 		}
 		go handleRequest(receiver, proxyAddress, rule)
 	}
 }
 
-func handleRequest(receiver net.Conn, proxyAddr string, rule *Rules) {
+func handleRequest(receiver net.Conn, proxyAddr []string, rule *Rules) {
 	err := base.Auth(receiver)
 	if err != nil {
 		fmt.Println("Authentication failed:", err)
@@ -75,11 +80,50 @@ func directConnect(receiver net.Conn, atyp int, addr string, port uint16) {
 	base.Forward(receiver, dest)
 }
 
-func proxyConnect(receiver net.Conn, proxyAddr string, atyp int, addr string, port uint16) {
-	sender, err := base.TryDial(receiver, proxyAddr)
+func proxyConnect(receiver net.Conn, proxyAddr []string, atyp int, addr string, port uint16) {
+	sender, err := base.TryDial(receiver, proxyAddr[0])
 	if err != nil {
 		fmt.Println("Connection failed:", err)
+		receiver.Write([]byte{5, 1})
 		receiver.Close()
+		return
+	}
+
+	for i := 1; i < len(proxyAddr); i++ {
+		err = clientAuth(sender)
+		if err != nil {
+			fmt.Println("Authentication failed:", err)
+			receiver.Write([]byte{5, 1})
+			receiver.Close()
+			sender.Close()
+			return
+		}
+		pAddr, pPortStr, _ := net.SplitHostPort(proxyAddr[i])
+		pPort, _ := strconv.Atoi(pPortStr)
+		_, _, err = clientConnect(sender, atyp, pAddr, uint16(pPort))
+		if err != nil {
+			fmt.Println("Connection failed:", err)
+			receiver.Write([]byte{5, 1})
+			receiver.Close()
+			sender.Close()
+			return
+		}
+	}
+
+	err = clientAuth(sender)
+	if err != nil {
+		fmt.Println("Authentication failed:", err)
+		receiver.Write([]byte{5, 1})
+		receiver.Close()
+		sender.Close()
+		return
+	}
+	_, _, err = clientConnect(sender, atyp, addr, port)
+	if err != nil {
+		fmt.Println("Connection failed:", err)
+		receiver.Write([]byte{5, 1})
+		receiver.Close()
+		sender.Close()
 		return
 	}
 
@@ -91,20 +135,6 @@ func proxyConnect(receiver net.Conn, proxyAddr string, atyp int, addr string, po
 		receiver.Close()
 		sender.Close()
 		fmt.Println("Error:", err)
-		return
-	}
-	err = clientAuth(sender)
-	if err != nil {
-		fmt.Println("Authentication failed:", err)
-		receiver.Close()
-		sender.Close()
-		return
-	}
-	_, _, err = clientConnect(sender, atyp, addr, port)
-	if err != nil {
-		fmt.Println("Connection failed:", err)
-		receiver.Close()
-		sender.Close()
 		return
 	}
 	if atyp == 4 {
