@@ -1,3 +1,4 @@
+// main program
 package main
 
 import (
@@ -37,5 +38,6 @@ func main() {
 		fmt.Println("SOCKS5 server is running on", addr)
 	}
 
+	proxyAddr = append(proxyAddr, "127.0.0.1:7891")
 	client.ClientListen(proxyClient, proxyAddr, &socksRule)
 }

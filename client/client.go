@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
-	"os/exec"
 	"proxy/base"
 	"strconv"
 )
@@ -17,8 +15,6 @@ func ClientListen(port net.Listener, proxyAddress []string, rule *Rules) {
 		receiver, err := port.Accept()
 		if err != nil {
 			fmt.Println("Failed to accept user request:", err)
-			exec.Command("sh", "-c", "echo 1; lsof -p "+fmt.Sprint(os.Getpid()))
-
 			continue
 		}
 		go handleRequest(receiver, proxyAddress, rule)
@@ -164,9 +160,12 @@ func clientConnect(sender net.Conn, atyp int, addr string, port uint16) (bnd_add
 	if atyp == 3 {
 		sender.Write([]byte{uint8(len(addr))})
 		sender.Write([]byte(addr))
+	} else if atyp == 1 { // ipv4
+		ip := net.ParseIP(addr)
+		sender.Write([]byte(ip.To4()))
 	} else {
 		ip := net.ParseIP(addr)
-		sender.Write([]byte(ip))
+		sender.Write([]byte(ip.To16()))
 	}
 	var buf [256]byte
 	binary.BigEndian.PutUint16(buf[:2], port)

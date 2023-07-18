@@ -212,6 +212,5 @@ func connect(client net.Conn) (net.Conn, error) {
 		dest.Close()
 		return nil, err
 	}
-	//fmt.Println("Connection established:", destAddr)
 	return dest, nil
 }
