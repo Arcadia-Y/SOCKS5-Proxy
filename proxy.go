@@ -22,6 +22,11 @@ func main() {
 		fmt.Println("Failed to parse rules:", err)
 		return
 	}
+	err = socksRule.ParseProgramRules("programRule.db")
+	if err != nil {
+		fmt.Println("Failed to parse rules:", err)
+		return
+	}
 
 	proxyClient, err := net.Listen("tcp", clientAddress)
 	if err != nil {
@@ -29,13 +34,13 @@ func main() {
 		return
 	}
 	defer proxyClient.Close()
-	fmt.Printf("Proxy Client is running on %s\n", clientAddress)
+	fmt.Printf("Proxy Client is listening on %s\n", clientAddress)
 
 	for _, addr := range proxyAddr {
 		cmd := exec.Command("./serverListen", addr)
 		cmd.Start()
 		defer cmd.Process.Kill()
-		fmt.Println("SOCKS5 server is running on", addr)
+		fmt.Println("SOCKS5 server is listening on", addr)
 	}
 
 	proxyAddr = append(proxyAddr, "127.0.0.1:7891")

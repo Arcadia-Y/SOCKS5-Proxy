@@ -34,22 +34,40 @@ func handleRequest(receiver net.Conn, proxyAddr []string, rule *Rules) {
 		receiver.Close()
 		return
 	}
-	isMatch := false
-	if atyp == 3 {
-		isMatch = rule.MatchKeyword(addr)
-	} else {
-		isMatch = rule.MatchCIDR(net.ParseIP(addr))
+
+	info := ""
+	proMatch, name, err := rule.MatchCmd(receiver)
+	info = "match ProgramKeyword: " + name
+	if err != nil {
+		fmt.Println("Failed to get program info:", err)
+		receiver.Close()
+		return
 	}
+	isMatch := false
+	if !proMatch {
+		if atyp == 3 {
+			isMatch, name = rule.MatchKeyword(addr)
+			if isMatch {
+				info = "match HostnameKeyword: " + name
+			}
+		} else {
+			isMatch, name = rule.MatchCIDR(net.ParseIP(addr))
+			if isMatch {
+				info = "match CIDR: " + name
+			}
+		}
+	}
+
 	// if match then DIRECT
-	if isMatch {
-		directConnect(receiver, atyp, addr, port)
+	if isMatch || proMatch {
+		directConnect(receiver, atyp, addr, port, info)
 		return
 	}
 	// else PROXY
 	proxyConnect(receiver, proxyAddr, atyp, addr, port)
 }
 
-func directConnect(receiver net.Conn, atyp int, addr string, port uint16) {
+func directConnect(receiver net.Conn, atyp int, addr string, port uint16, info string) {
 	if atyp == 4 {
 		addr = "[" + addr + "]"
 	}
@@ -72,7 +90,7 @@ func directConnect(receiver net.Conn, atyp int, addr string, port uint16) {
 		return
 	}
 
-	fmt.Println("[DIRECT]:", destAddr)
+	fmt.Println("[DIRECT]:", destAddr, "   ", info)
 	base.Forward(receiver, dest)
 }
 
