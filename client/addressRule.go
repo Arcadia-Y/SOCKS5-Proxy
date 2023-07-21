@@ -13,12 +13,10 @@ type Rules struct {
 	addrON  bool
 	progON  bool
 	httpON  bool
-	reverseON bool
 	keyword map[string]bool
 	cidr    map[*net.IPNet]bool
 	program map[string]bool
 	http    map[string]bool
-	reverse map[string]string
 }
 
 func (r *Rules) ParseRules(name string) error {
