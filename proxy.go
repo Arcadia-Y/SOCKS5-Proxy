@@ -4,13 +4,16 @@ package main
 import (
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
+	"os/signal"
 	"proxy/client"
+	"syscall"
 )
 
 func main() {
 	clientAddress := "0.0.0.0:8080"
-	reverseAddr := "127.0.0.1:12345"
+	reverseAddr := "127.0.0.1:80"
 	var cl client.Client
 
 	err := cl.ParseProxyAddr("proxyAddr.db")
@@ -30,6 +33,12 @@ func main() {
 		fmt.Println("Failed to parse reverseList:", err)
 		return
 	}
+	err = cl.Res.ModifyHost()
+	if err != nil {
+		fmt.Println("Failed to modify hosts:", err)
+		return
+	}
+	defer cl.Res.RestoreHost()
 	go cl.Res.Listen(reverseAddr)
 
 	clientListener, err := net.Listen("tcp", clientAddress)
@@ -48,5 +57,10 @@ func main() {
 	}
 
 	cl.ProxyAddr = append(cl.ProxyAddr, "127.0.0.1:7891")
-	cl.Listen(clientListener)
+	go cl.Listen(clientListener)
+	signalChannel := make(chan os.Signal, 1)
+	signal.Notify(signalChannel, os.Interrupt, syscall.SIGTERM)
+	<-signalChannel
+	cl.End = true
+	fmt.Println("\nExit")
 }

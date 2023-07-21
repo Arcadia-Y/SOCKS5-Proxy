@@ -17,6 +17,7 @@ type ReverseServer struct {
 	host     string
 	port     uint16
 	list     map[string]string
+	hostsize int64
 }
 
 func (r *ReverseServer) ParseList(name string) error {
@@ -71,17 +72,32 @@ func (r *ReverseServer) Listen(addr string) {
 	r.reserveListen()
 }
 
-func (r *ReverseServer) Redirect(atyp *int, addr *string, port *uint16) {
-	if !r.on || *atyp != 3 {
+func (r *ReverseServer) ModifyHost() (err error) {
+	f, err := os.OpenFile("/etc/hosts", os.O_APPEND|os.O_RDWR, 0666)
+	if err != nil {
 		return
 	}
-	for k := range r.list {
-		if k == *addr {
-			*atyp = 1
-			*addr = r.host
-			*port = r.port
+	info, err := f.Stat()
+	if err != nil {
+		return
+	}
+	r.hostsize = info.Size()
+	for key := range r.list {
+		towrite := "127.0.0.1 " + key + "\n"
+		_, err = f.Write([]byte(towrite))
+		if err != nil {
 			return
 		}
+	}
+	return
+}
+
+func (r *ReverseServer) RestoreHost() {
+	f, _ := os.OpenFile("/etc/hosts", os.O_RDWR, 0666)
+	err := f.Truncate(r.hostsize)
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 }
 
@@ -113,11 +129,10 @@ func (r *ReverseServer) handleRequest(conn net.Conn) {
 			continue
 		}
 		if strings.Contains(line, "Host: ") {
-			for key, v := range r.list {
-				if line[6:] == key {
-					line = "Host: " + v
-					goal = v + ":80"
-				}
+			v, ok := r.list[line[6:]]
+			if ok {
+				line = "Host: " + v
+				goal = v + ":80"
 			}
 		}
 		line = line + string(buf[i])

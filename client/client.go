@@ -17,6 +17,7 @@ type Client struct {
 	ProxyAddr []string
 	rule      Rules
 	Res       reverse.ReverseServer
+	End       bool
 }
 
 func (c *Client) ParseProxyAddr(name string) error {
@@ -60,6 +61,9 @@ func (c *Client) ParseRules() (err error) {
 func (c *Client) Listen(port net.Listener) {
 	for {
 		receiver, err := port.Accept()
+		if c.End {
+			return
+		}
 		if err != nil {
 			fmt.Println("Failed to accept user request:", err)
 			continue
@@ -123,7 +127,6 @@ func (c *Client) handleRequest(receiver net.Conn) {
 }
 
 func (c *Client) directConnect(receiver net.Conn, atyp int, addr string, port uint16, tosend []byte, info string, needRe bool) {
-	c.Res.Redirect(&atyp, &addr, &port)
 	if atyp == 4 {
 		addr = "[" + addr + "]"
 	}
@@ -154,7 +157,6 @@ func (c *Client) directConnect(receiver net.Conn, atyp int, addr string, port ui
 }
 
 func (c *Client) proxyConnect(receiver net.Conn, atyp int, addr string, port uint16, tosend []byte) {
-	c.Res.Redirect(&atyp, &addr, &port)
 	sender, err := base.TryDial(receiver, c.ProxyAddr[0])
 	if err != nil {
 		fmt.Println("Connection failed:", err)
