@@ -7,21 +7,22 @@ import (
 	"io"
 	"net"
 	"proxy/base"
+	"proxy/reverse"
 	"strconv"
 )
 
-func ClientListen(port net.Listener, proxyAddress []string, rule *Rules) {
+func ClientListen(port net.Listener, proxyAddress []string, rule *Rules, res *reverse.ReverseServer) {
 	for {
 		receiver, err := port.Accept()
 		if err != nil {
 			fmt.Println("Failed to accept user request:", err)
 			continue
 		}
-		go handleRequest(receiver, proxyAddress, rule)
+		go handleRequest(receiver, proxyAddress, rule, res)
 	}
 }
 
-func handleRequest(receiver net.Conn, proxyAddr []string, rule *Rules) {
+func handleRequest(receiver net.Conn, proxyAddr []string, rule *Rules, res *reverse.ReverseServer) {
 	err := base.Auth(receiver)
 	if err != nil {
 		fmt.Println("Authentication failed:", err)
@@ -44,7 +45,7 @@ func handleRequest(receiver net.Conn, proxyAddr []string, rule *Rules) {
 		return
 	}
 	if isMatch {
-		directConnect(receiver, atyp, addr, port, []byte{}, info, true)
+		directConnect(receiver, atyp, addr, port, []byte{}, info, true, res)
 		return
 	}
 	// check addressRule
@@ -60,7 +61,7 @@ func handleRequest(receiver net.Conn, proxyAddr []string, rule *Rules) {
 		}
 	}
 	if isMatch {
-		directConnect(receiver, atyp, addr, port, []byte{}, info, true)
+		directConnect(receiver, atyp, addr, port, []byte{}, info, true, res)
 		return
 	}
 	// check httpRule
@@ -68,14 +69,15 @@ func handleRequest(receiver net.Conn, proxyAddr []string, rule *Rules) {
 	isMatch, name, tosend := rule.MatchHttp(receiver)
 	info = "match HttpKeyword: " + name
 	if isMatch {
-		directConnect(receiver, atyp, addr, port, tosend, info, false)
+		directConnect(receiver, atyp, addr, port, tosend, info, false, res)
 		return
 	}
 	// proxy
-	proxyConnect(receiver, proxyAddr, atyp, addr, port, tosend)
+	proxyConnect(receiver, proxyAddr, atyp, addr, port, tosend, res)
 }
 
-func directConnect(receiver net.Conn, atyp int, addr string, port uint16, tosend []byte, info string, needRe bool) {
+func directConnect(receiver net.Conn, atyp int, addr string, port uint16, tosend []byte, info string, needRe bool, res *reverse.ReverseServer) {
+	res.Redirect(&atyp, &addr, &port)
 	if atyp == 4 {
 		addr = "[" + addr + "]"
 	}
@@ -105,7 +107,8 @@ func directConnect(receiver net.Conn, atyp int, addr string, port uint16, tosend
 	base.Forward(receiver, dest)
 }
 
-func proxyConnect(receiver net.Conn, proxyAddr []string, atyp int, addr string, port uint16, tosend []byte) {
+func proxyConnect(receiver net.Conn, proxyAddr []string, atyp int, addr string, port uint16, tosend []byte, res *reverse.ReverseServer) {
+	res.Redirect(&atyp, &addr, &port)
 	sender, err := base.TryDial(receiver, proxyAddr[0])
 	if err != nil {
 		fmt.Println("Connection failed:", err)
