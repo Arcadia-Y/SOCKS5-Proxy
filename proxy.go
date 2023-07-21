@@ -27,6 +27,11 @@ func main() {
 		fmt.Println("Failed to parse rules:", err)
 		return
 	}
+	err = socksRule.ParseHttpRules("httpRule.db")
+	if err != nil {
+		fmt.Println("Failed to parse rules:", err)
+		return
+	}
 
 	proxyClient, err := net.Listen("tcp", clientAddress)
 	if err != nil {

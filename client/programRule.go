@@ -2,6 +2,7 @@ package client
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -21,6 +22,17 @@ func (r *Rules) ParseProgramRules(name string) error {
 	r.program = make(map[string]bool)
 	scanner := bufio.NewScanner(f)
 	scanner.Split(bufio.ScanWords)
+
+	scanner.Scan()
+	state := scanner.Text()
+	if state == "ON" {
+		r.progON = true
+	} else if state == "OFF" {
+		r.progON = false
+	} else {
+		return errors.New("first word should be \"ON\" or \"OFF\"")
+	}
+
 	for scanner.Scan() {
 		word := scanner.Text()
 		r.program[word] = true
@@ -29,6 +41,9 @@ func (r *Rules) ParseProgramRules(name string) error {
 }
 
 func (r *Rules) MatchCmd(conn net.Conn) (bool, string, error) {
+	if !r.progON || len(r.program) == 0 {
+		return false, "", nil
+	}
 	cmd, err := GetCmd(conn)
 	if err != nil {
 		return false, "", err
@@ -67,7 +82,7 @@ func fill0(s string, digit int) string {
 	}
 	return s
 }
- 
+
 func isNumber(s string) bool {
 	_, err := strconv.ParseUint(s, 10, 32)
 	return err == nil

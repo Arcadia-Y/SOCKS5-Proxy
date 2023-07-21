@@ -34,40 +34,48 @@ func handleRequest(receiver net.Conn, proxyAddr []string, rule *Rules) {
 		receiver.Close()
 		return
 	}
-
+	// check programRule
 	info := ""
-	proMatch, name, err := rule.MatchCmd(receiver)
+	isMatch, name, err := rule.MatchCmd(receiver)
 	info = "match ProgramKeyword: " + name
 	if err != nil {
 		fmt.Println("Failed to get program info:", err)
 		receiver.Close()
 		return
 	}
-	isMatch := false
-	if !proMatch {
-		if atyp == 3 {
-			isMatch, name = rule.MatchKeyword(addr)
-			if isMatch {
-				info = "match HostnameKeyword: " + name
-			}
-		} else {
-			isMatch, name = rule.MatchCIDR(net.ParseIP(addr))
-			if isMatch {
-				info = "match CIDR: " + name
-			}
-		}
-	}
-
-	// if match then DIRECT
-	if isMatch || proMatch {
-		directConnect(receiver, atyp, addr, port, info)
+	if isMatch {
+		directConnect(receiver, atyp, addr, port, []byte{}, info, true)
 		return
 	}
-	// else PROXY
-	proxyConnect(receiver, proxyAddr, atyp, addr, port)
+	// check addressRule
+	if atyp == 3 {
+		isMatch, name = rule.MatchKeyword(addr)
+		if isMatch {
+			info = "match HostnameKeyword: " + name
+		}
+	} else {
+		isMatch, name = rule.MatchCIDR(net.ParseIP(addr))
+		if isMatch {
+			info = "match CIDR: " + name
+		}
+	}
+	if isMatch {
+		directConnect(receiver, atyp, addr, port, []byte{}, info, true)
+		return
+	}
+	// check httpRule
+	base.WriteResponse(receiver, net.ParseIP("1.2.3.4"), 8080)
+	isMatch, name, tosend := rule.MatchHttp(receiver)
+	info = "match HttpKeyword: " + name
+	if isMatch {
+		directConnect(receiver, atyp, addr, port, tosend, info, false)
+		return
+	}
+	// proxy
+	proxyConnect(receiver, proxyAddr, atyp, addr, port, tosend)
 }
 
-func directConnect(receiver net.Conn, atyp int, addr string, port uint16, info string) {
+func directConnect(receiver net.Conn, atyp int, addr string, port uint16, tosend []byte, info string, needRe bool) {
 	if atyp == 4 {
 		addr = "[" + addr + "]"
 	}
@@ -79,22 +87,25 @@ func directConnect(receiver net.Conn, atyp int, addr string, port uint16, info s
 		return
 	}
 
-	localAddr := dest.LocalAddr()
-	ip := localAddr.(*net.TCPAddr).IP
-	port = uint16(localAddr.(*net.TCPAddr).Port)
-	err = base.WriteResponse(receiver, ip, port)
-	if err != nil {
-		receiver.Close()
-		dest.Close()
-		fmt.Println("Error:", err)
-		return
+	if needRe {
+		localAddr := dest.LocalAddr()
+		ip := localAddr.(*net.TCPAddr).IP
+		port = uint16(localAddr.(*net.TCPAddr).Port)
+		err = base.WriteResponse(receiver, ip, port)
+		if err != nil {
+			receiver.Close()
+			dest.Close()
+			fmt.Println("Error:", err)
+			return
+		}
 	}
 
 	fmt.Println("[DIRECT]:", destAddr, "   ", info)
+	dest.Write(tosend)
 	base.Forward(receiver, dest)
 }
 
-func proxyConnect(receiver net.Conn, proxyAddr []string, atyp int, addr string, port uint16) {
+func proxyConnect(receiver net.Conn, proxyAddr []string, atyp int, addr string, port uint16, tosend []byte) {
 	sender, err := base.TryDial(receiver, proxyAddr[0])
 	if err != nil {
 		fmt.Println("Connection failed:", err)
@@ -141,21 +152,12 @@ func proxyConnect(receiver net.Conn, proxyAddr []string, atyp int, addr string, 
 		return
 	}
 
-	localAddr := sender.LocalAddr()
-	ip := localAddr.(*net.TCPAddr).IP
-	localport := uint16(localAddr.(*net.TCPAddr).Port)
-	err = base.WriteResponse(receiver, ip, localport)
-	if err != nil {
-		receiver.Close()
-		sender.Close()
-		fmt.Println("Error:", err)
-		return
-	}
 	if atyp == 4 {
 		addr = "[" + addr + "]"
 	}
 	destAddr := fmt.Sprintf("%s:%d", addr, port)
 	fmt.Println("[PROXY]:", destAddr)
+	sender.Write(tosend)
 	base.Forward(receiver, sender)
 }
 

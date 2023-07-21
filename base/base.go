@@ -170,7 +170,7 @@ func Forward(client, target net.Conn) {
 		io.Copy(src, dest)
 	}
 	go forwarding(client, target)
-	go forwarding(target, client)
+	forwarding(target, client)
 }
 
 func handleRequest(conn net.Conn) {

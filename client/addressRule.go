@@ -10,9 +10,13 @@ import (
 )
 
 type Rules struct {
+	addrON  bool
+	progON  bool
+	httpON  bool
 	keyword map[string]bool
 	cidr    map[*net.IPNet]bool
 	program map[string]bool
+	http    map[string]bool
 }
 
 func (r *Rules) ParseRules(name string) error {
@@ -26,6 +30,17 @@ func (r *Rules) ParseRules(name string) error {
 	r.cidr = make(map[*net.IPNet]bool)
 	scanner := bufio.NewScanner(f)
 	scanner.Split(bufio.ScanWords)
+
+	scanner.Scan()
+	state := scanner.Text()
+	if state == "ON" {
+		r.addrON = true
+	} else if state == "OFF" {
+		r.addrON = false
+	} else {
+		return errors.New("first word should be \"ON\" or \"OFF\"")
+	}
+
 	for scanner.Scan() {
 		word := scanner.Text()
 		_, ipNet, err := net.ParseCIDR(word)
@@ -42,6 +57,9 @@ func (r *Rules) ParseRules(name string) error {
 }
 
 func (r *Rules) MatchCIDR(x net.IP) (bool, string) {
+	if !r.addrON {
+		return false, ""
+	}
 	for key := range r.cidr {
 		if key.Contains(x) {
 			return true, key.String()
@@ -51,6 +69,9 @@ func (r *Rules) MatchCIDR(x net.IP) (bool, string) {
 }
 
 func (r *Rules) MatchKeyword(x string) (bool, string) {
+	if !r.addrON {
+		return false, ""
+	}
 	for key := range r.keyword {
 		if strings.Contains(x, key) {
 			return true, key
