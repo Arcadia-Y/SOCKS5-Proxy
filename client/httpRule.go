@@ -41,10 +41,18 @@ func (r *Rules) MatchHttp(conn net.Conn) (res bool, key string, tosend []byte) {
 	if !r.httpON || len(r.http) == 0 {
 		return
 	}
-	var buf [256]byte
-	n, _ := conn.Read(buf[:256])
+	var buf [1024]byte
+	n, _ := conn.Read(buf[:1024])
 	tosend = append(tosend, buf[:n]...)
 	if !strings.Contains(string(buf[:n]), "HTTP") {
+		// HTTPS
+		for keyword := range r.http {
+			if strings.Contains(string(tosend), keyword) {
+				res = true
+				key = keyword
+				return
+			}
+		}
 		return
 	}
 	line := ""
