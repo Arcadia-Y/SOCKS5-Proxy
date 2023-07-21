@@ -97,26 +97,3 @@ func checkAddr(s string) bool {
 	}
 	return true
 }
-
-func ParseProxyAddr(name string) ([]string, error) {
-	f, err := os.Open(name)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	var ret []string
-	scanner := bufio.NewScanner(f)
-	scanner.Split(bufio.ScanWords)
-	for scanner.Scan() {
-		word := scanner.Text()
-		if !checkAddr(word) {
-			return nil, errors.New("invalid proxy address")
-		}
-		ret = append(ret, word)
-	}
-	if len(ret) == 0 {
-		return nil, errors.New("no proxy address found")
-	}
-	return ret, nil
-}
